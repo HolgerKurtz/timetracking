@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      #loading {
+        display: none;
+      }
+      .color-info {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+      }
+      .color-box {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        margin-right: 12px;
+        margin-top: 4px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+      }
+      .color-details {
+        flex-grow: 1;
+        width: 100%;
+      }
+      .project-input {
+        margin-bottom: 8px;
+      }
+      .sample-event {
+        font-size: 0.85em;
+        color: #666;
+        line-height: 1.4;
+        word-wrap: break-word;
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        position: relative;
+      }
+      .sample-event:hover {
+        -webkit-line-clamp: unset;
+        line-clamp: unset;
+        cursor: pointer;
+        color: #333;
+      }
+      .sample-event::before {
+        content: "Sample: ";
+        color: #888;
+        font-weight: 500;
+      }
+      .alert-info {
+        background-color: #e8f4f8;
+        border-color: #d0e8f0;
+      }
+      .loading-spinner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #6c757d;
+        padding: 10px;
+      }
+      .loading-spinner .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <h4 class="mb-4">⏰ Import Google Calendar Events</h4>
+
+      <div class="form-group">
+        <label for="calendarId">Calendar ID:</label>
+        <input type="text" class="form-control" id="calendarId" />
+      </div>
+
+      <div class="form-group">
+        <label for="startDate">Start Date:</label>
+        <input type="date" class="form-control" id="startDate" />
+      </div>
+
+      <div class="form-group">
+        <label for="endDate">End Date:</label>
+        <input type="date" class="form-control" id="endDate" />
+      </div>
+
+      <div class="form-group">
+        <label for="searchText">Search Text (optional):</label>
+        <input type="text" class="form-control" id="searchText" />
+      </div>
+
+      <div class="form-group">
+        <h5 class="mb-3">Calendar Colors & Projects</h5>
+        <div id="colorMappings" class="mb-3">
+          <div class="loading-spinner">
+            <div class="spinner-border text-secondary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="small">Loading calendar information...</span>
+          </div>
+        </div>
+        <div class="alert alert-info small">
+          <i class="fas fa-info-circle"></i> Assign project names to your
+          calendar colors. These assignments will be saved for future imports.
+        </div>
+      </div>
+
+      <button class="btn btn-primary w-100 mb-3" onclick="importEvents()">
+        Import Events
+      </button>
+
+      <div id="loading" class="text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Importing events...</p>
+      </div>
+    </div>
+
+    <script>
+      // Load and display calendar colors
+      function loadCalendarColors() {
+        const calendarId = document.getElementById("calendarId").value;
+        if (!calendarId) {
+          document.getElementById("colorMappings").innerHTML =
+            '<div class="text-muted small">Enter a Calendar ID to see color information</div>';
+          return;
+        }
+
+        // Show loading spinner
+        document.getElementById("colorMappings").innerHTML = `
+          <div class="loading-spinner">
+            <div class="spinner-border text-secondary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="small">Loading calendar information...</span>
+          </div>
+        `;
+
+        google.script.run
+          .withSuccessHandler(function (colorMap) {
+            const container = document.getElementById("colorMappings");
+            if (Object.keys(colorMap).length === 0) {
+              container.innerHTML =
+                '<div class="text-muted small">No events found in the last 6 months</div>';
+              return;
+            }
+
+            container.innerHTML = "";
+            Object.values(colorMap).forEach(
+              ({ colorId, colorHex, sampleEvent, projectName }) => {
+                const div = document.createElement("div");
+                div.className = "color-info";
+                div.innerHTML = `
+                <div class="color-box" style="background-color: ${colorHex}"></div>
+                <div class="color-details">
+                  <input type="text" 
+                         class="form-control form-control-sm project-input" 
+                         value="${projectName}"
+                         placeholder="Enter project name"
+                         onchange="updateProject('${colorId}', this.value)">
+                  <div class="sample-event" title="${sampleEvent}">${sampleEvent}</div>
+                </div>
+              `;
+                container.appendChild(div);
+              }
+            );
+          })
+          .withFailureHandler(function (error) {
+            document.getElementById("colorMappings").innerHTML =
+              '<div class="text-danger small">Error loading calendar information</div>';
+          })
+          .getCalendarColors(calendarId);
+      }
+
+      function updateProject(colorId, projectName) {
+        // Show loading spinner
+        document.getElementById("colorMappings").innerHTML = `
+          <div class="loading-spinner">
+            <div class="spinner-border text-secondary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="small">Updating project mappings...</span>
+          </div>
+        `;
+
+        google.script.run
+          .withSuccessHandler(function (colorMap) {
+            // Refresh the color mappings display
+            const container = document.getElementById("colorMappings");
+            if (Object.keys(colorMap).length === 0) {
+              container.innerHTML =
+                '<div class="text-muted small">No events found in the last 6 months</div>';
+              return;
+            }
+
+            container.innerHTML = "";
+            Object.values(colorMap).forEach(
+              ({ colorId, colorHex, sampleEvent, projectName }) => {
+                const div = document.createElement("div");
+                div.className = "color-info";
+                div.innerHTML = `
+                <div class="color-box" style="background-color: ${colorHex}"></div>
+                <div class="color-details">
+                  <input type="text" 
+                         class="form-control form-control-sm project-input" 
+                         value="${projectName}"
+                         placeholder="Enter project name"
+                         onchange="updateProject('${colorId}', this.value)">
+                  <div class="sample-event" title="${sampleEvent}">${sampleEvent}</div>
+                </div>
+              `;
+                container.appendChild(div);
+              }
+            );
+          })
+          .updateProjectMapping(colorId, projectName);
+      }
+
+      function importEvents() {
+        const data = {
+          calendarId: document.getElementById("calendarId").value,
+          startDate: document.getElementById("startDate").value,
+          endDate: document.getElementById("endDate").value,
+          searchText: document.getElementById("searchText").value,
+        };
+
+        document.getElementById("loading").style.display = "block";
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            document.getElementById("loading").style.display = "none";
+            if (result.success) {
+              alert("Events imported successfully!");
+            } else {
+              alert("Error: " + result.message);
+            }
+          })
+          .withFailureHandler(function (error) {
+            document.getElementById("loading").style.display = "none";
+            alert("Error: " + error.message);
+          })
+          .importEventsFromSidebar(data);
+      }
+
+      // Load initial data
+      document.addEventListener("DOMContentLoaded", function () {
+        // Set default dates
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        document.getElementById("startDate").value = firstDay
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("endDate").value = lastDay
+          .toISOString()
+          .split("T")[0];
+
+        // Load calendar ID if saved
+        google.script.run
+          .withSuccessHandler(function (calendarId) {
+            if (calendarId) {
+              document.getElementById("calendarId").value = calendarId;
+              loadCalendarColors(); // Load colors once we have the calendar ID
+            }
+          })
+          .getSavedCalendarId();
+
+        // Add calendar ID change listener
+        document
+          .getElementById("calendarId")
+          .addEventListener("change", loadCalendarColors);
+      });
+    </script>
+  </body>
+</html>
