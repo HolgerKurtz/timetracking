@@ -1,16 +1,19 @@
-# Free Timetracking App with Google Calendar & Google Sheet
-Free Template for Freelancers 
+# Time Tracking App with Google Calendar & Google Sheets
 
-By using Color Labels in Google Calendar, you can group events to custom projects.
-With this Google App Script, you can download your time entries to google sheet to share with your clients.
+A free template for freelancers
 
-## How to
-1. Start using color labels in Google Calendar
-2. Copy And Paste the App Script
-3. There's a new Menu Item, click it
-4. Fill in your information and map your colors to your projects
-5. Import event entries within your custom date range
+With Google Calendar color labels, you can categorize events by project. This Google Apps Script allows you to export your time entries to Google Sheets, making it easy to share your tracked hours with clients.
+
+## How to Use
+	1.	Assign color labels to events in Google Calendar.
+	2.	Copy and paste the provided Apps Script into your Google account.
+	3.	A new menu item will appear—click on it.
+	4.	Enter your details and map your calendar colors to specific projects.
+	5.	Import your time entries for any custom date range.
 
 ---
-As of now, you can't pull the custom color label names from google calendar directly via the api (??? why, google?). 
-That's why you have to manually map the projects in in sidebar again.
+
+**Important Note**
+
+Currently, Google Calendar’s API does not allow direct retrieval of custom color _label names_ (why, Google?).
+As a result, you’ll need to manually map your projects in the sidebar.
