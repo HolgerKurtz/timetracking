@@ -18,3 +18,7 @@ With Google Calendar color labels, you can categorize events by project. This Go
 
 Currently, Google Calendar’s API does not allow direct retrieval of custom color _label names_ (why, Google?).
 As a result, you’ll need to manually map your projects in the sidebar.
+
+**Contact**
+hk+timetracking@holgerkurtz.de
+www.holgerkurtz.de
