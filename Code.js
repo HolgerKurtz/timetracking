@@ -68,9 +68,9 @@ function getCalendarColors(calendarId) {
     const calendar = CalendarApp.getCalendarById(calendarId);
     if (!calendar) return {};
 
-    // Get all events for the last 6 months to analyze colors
+    // Get all events for the last 3 months to analyze colors
     const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgoMonthsAgo.getMonth() - 3);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const events = calendar.getEvents(threeMonthsAgo, new Date());
 
     // Get saved project mappings
