@@ -20,5 +20,7 @@ Currently, Google Calendar’s API does not allow direct retrieval of custom col
 As a result, you’ll need to manually map your projects in the sidebar.
 
 **Contact**
+
 hk+timetracking@holgerkurtz.de
+
 www.holgerkurtz.de
