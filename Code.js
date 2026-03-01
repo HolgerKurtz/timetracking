@@ -94,12 +94,16 @@ function coreImportEvents(calendarId, startDate, endDate, searchText) {
       if (!response.items) break;
 
       const filtered = response.items.filter(event => {
-        // 1. Filter Declined
+        // 1. SAFETY: Skip events with missing start/end (Fixes Task/WorkingLocation issues)
+        if (!event.start || !event.end) return false;
+
+        // 2. Filter Declined
         if (event.attendees) {
           const self = event.attendees.find(a => a.email === userEmail || a.self);
           if (self && self.responseStatus === "declined") return false;
         }
-        // 2. Filter All-Day Events (User Request)
+
+        // 3. Filter All-Day Events (User Request)
         if (event.start.date) return false; 
         
         return true;
@@ -114,17 +118,24 @@ function coreImportEvents(calendarId, startDate, endDate, searchText) {
     // -- PROCESS DATA --
     const savedMappings = PropertiesService.getUserProperties().getProperty(PROPS_KEYS.COLOR_MAPPINGS);
     const projectMappings = savedMappings ? JSON.parse(savedMappings) : {};
+    const timeZone = Session.getScriptTimeZone();
 
     const eventRows = events.map(event => {
-      const start = new Date(event.start.dateTime);
-      const end = new Date(event.end.dateTime);
-      const duration = (end - start) / (1000 * 60 * 60);
+      // We parse the date...
+      const startObj = new Date(event.start.dateTime);
+      const endObj = new Date(event.end.dateTime);
+      
+      // ...but we turn it into a String immediately. 
+      // This satisfies the "Typed Column" in Sheets without needing .setNumberFormat()
+      const startStr = Utilities.formatDate(startObj, timeZone, "dd.MM.yyyy HH:mm:ss");
+      const endStr = Utilities.formatDate(endObj, timeZone, "dd.MM.yyyy HH:mm:ss");
+      
+      const duration = (endObj - startObj) / (1000 * 60 * 60);
 
       // Map Colors
       const colorId = event.colorId || "Default";
       let projectName = projectMappings[colorId];
       
-      // Fallback for unmapped
       if (!projectName) {
         projectName = (colorId === "Default") ? "Internal / Non-Client" : "Unmapped Color";
       }
@@ -132,15 +143,14 @@ function coreImportEvents(calendarId, startDate, endDate, searchText) {
       return [
         event.summary || "(No Title)",
         cleanHtmlText(event.description || ""),
-        start,
-        end,
+        startStr, // Sending String instead of Date object
+        endStr,   // Sending String instead of Date object
         duration,
         projectName,
       ];
     });
 
     // -- CLEAR & WRITE --
-    // Safe clear: don't touch headers
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
       sheet.getRange(2, 1, lastRow - 1, header[0].length).clearContent();
@@ -149,9 +159,9 @@ function coreImportEvents(calendarId, startDate, endDate, searchText) {
     const outputRange = sheet.getRange(2, 1, eventRows.length, header[0].length);
     outputRange.setValues(eventRows);
 
-    // Formats
-    sheet.getRange(2, 3, eventRows.length, 2).setNumberFormat("dd/MM/yyyy HH:mm");
-    sheet.getRange(2, 5, eventRows.length, 1).setNumberFormat("0.00");
+    // REMOVED: .setNumberFormat lines to prevent the "Typed Column" error.
+    // The data is now sent as pre-formatted strings which the Table will accept.
+    
     sheet.autoResizeColumns(1, header[0].length);
 
     return { success: true };
@@ -171,13 +181,9 @@ function coreImportEvents(calendarId, startDate, endDate, searchText) {
  */
 
 function getSettings() {
-  // We need the ID to fetch samples. 
-  // If not saved, guess the user's email.
   const calendarId = getSavedCalendarId() || Session.getActiveUser().getEmail();
-  
   return {
     calendarId: calendarId,
-    // Pass the ID so we can look up real events
     colors: getCalendarColors(calendarId) 
   };
 }
@@ -188,12 +194,10 @@ function updateProjectMapping(colorId, projectName) {
   
   mappings[colorId] = projectName;
   props.setProperty(PROPS_KEYS.COLOR_MAPPINGS, JSON.stringify(mappings));
-  
   return { success: true };
 }
 
 function getCalendarColors(calendarId) {
-  // 1. Define Standard Palette
   const standardColors = {
     "Default": "#ffffff", 
     "1": "#7986cb", "2": "#33b679", "3": "#8e24aa", "4": "#e67c73",
@@ -201,33 +205,26 @@ function getCalendarColors(calendarId) {
     "9": "#3f51b5", "10": "#0b8043", "11": "#d50000"
   };
 
-  // 2. Fetch Saved Mappings
   const props = PropertiesService.getUserProperties();
   const mappings = JSON.parse(props.getProperty(PROPS_KEYS.COLOR_MAPPINGS) || "{}");
-
-  // 3. Find Sample Events (The missing feature)
   const samples = {};
   
   try {
-    // Look back 3 months to find representative events
     const now = new Date();
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(now.getMonth() - 3);
 
-    // Use Advanced API for speed
     const response = Calendar.Events.list(calendarId, {
       timeMin: threeMonthsAgo.toISOString(),
       timeMax: now.toISOString(),
       singleEvents: true,
-      maxResults: 250, // Don't need infinite events, just enough to get samples
+      maxResults: 250, 
       orderBy: "startTime"
     });
 
     if (response.items) {
-      // Loop through events and grab the first title found for each color
       response.items.forEach(event => {
         const cId = event.colorId || "Default";
-        // Only save the sample if we haven't found one for this color yet
         if (!samples[cId] && event.summary) {
           samples[cId] = event.summary;
         }
@@ -235,18 +232,15 @@ function getCalendarColors(calendarId) {
     }
   } catch (e) {
     console.warn("Could not fetch samples: " + e.toString());
-    // We continue even if this fails, just without samples
   }
 
-  // 4. Merge Data for Frontend
   const colorList = [];
   for (const [id, hex] of Object.entries(standardColors)) {
     colorList.push({
       id: id,
       hex: hex,
       name: mappings[id] || "",
-      // Attach the sample event title we found, or a fallback
-      sample: samples[id] || "(No recent events with this color)"
+      sample: samples[id] || "(No recent events)"
     });
   }
   
